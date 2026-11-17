@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Charis Studio — it listens, so the screen keeps up</title>
+<meta name="description" content="Lyrics, scripture, cameras, streaming and recording in one Windows app that hears the service and gets the right thing on screen. Now in early access.">
+<meta property="og:title" content="Charis Studio">
+<meta property="og:description" content="One app for the screen, the stream and the room, that listens and follows along. Now in early access.">
+<meta property="og:image" content="https://studio.charislight.com/logo.png">
+<meta name="theme-color" content="#0d0b0a">
+<link rel="icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Charis Studio — "light in a dark room".
+   A stage-dark page lit by one warm projector beam. Fraunces for the voice, Instrument Sans to read,
+   JetBrains Mono for the production details (cues, timecodes) that operators live in. */
+:root {
+  --night: #0d0b0a;        /* the room */
+  --night-2: #14110f;
+  --ink: #f4eee6;          /* warm white, like projected light */
+  --dim: #a59c91;
+  --faint: #6f675e;
+  --rule: #2a2420;
+  --amber: #f59e0b;
+  --flame: #ff4d2e;
+  --violet: #9b7bff;
+  --light: linear-gradient(in oklch 110deg, #ff4d2e, #f59e0b 70%);
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', Consolas, monospace;
+  --out: cubic-bezier(.22, 1, .36, 1);          /* arriving */
+  --in-out: cubic-bezier(.65, 0, .35, 1);       /* changing while visible */
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--night); color: var(--ink); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+.mono { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+::selection { background: var(--amber); color: var(--night); }
+
+/* grain, so the dark reads as a room rather than a flat colour */
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* ---------- header ---------- */
+header { position: absolute; inset: 0 0 auto; z-index: 20; }
+header .wrap { display: flex; align-items: center; gap: 28px; height: 76px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 600 18px/1 var(--sans); letter-spacing: -.01em; }
+.brand img { width: 30px; height: 30px; }
+nav { display: flex; align-items: center; gap: 26px; margin-left: auto; font-size: 15px; }
+nav a { text-decoration: none; color: var(--dim); transition: color 160ms var(--out); }
+nav a:hover { color: var(--ink); }
+
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px 0 18px; border-radius: 999px; font: 600 15px/1 var(--sans); text-decoration: none; white-space: nowrap;
+  border: 1px solid var(--rule); color: var(--ink); background: transparent; cursor: pointer;
+  transition: background-color 180ms var(--out), border-color 180ms var(--out), transform 120ms var(--out); }
+.btn:hover { border-color: #4a4038; background: rgba(255,255,255,.03); }
+.btn:active { transform: scale(.97); }
+.btn.lit { background: var(--amber); color: #1a0f02; border-color: transparent; box-shadow: 0 8px 30px -10px rgba(245,158,11,.6); }
+.btn.lit:hover { background: #ffb02e; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn.sm { height: 40px; padding: 0 18px; font-size: 14px; }
+.btn.text { padding: 0 18px; }
+
+/* ---------- hero ---------- */
+.hero { position: relative; min-height: min(100vh, 940px); padding: 140px 0 80px; display: flex; align-items: center; }
+/* the projector beam, falling from the top right onto the stage */
+.beam { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.beam .ray { position: absolute; top: -20%; right: -10%; width: 90vw; height: 140%; will-change: transform;
+  background: conic-gradient(from 205deg at 85% 0%, transparent 0deg, rgba(245,158,11,.10) 14deg, rgba(255,77,46,.07) 26deg, transparent 40deg);
+  filter: blur(20px); }
+.beam::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 240px; background: linear-gradient(transparent, var(--night)); }
+
+.hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 56px; align-items: center; width: 100%; }
+.kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+.kicker .tag { font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--amber); border: 1px solid rgba(245,158,11,.35); padding: 6px 10px; border-radius: 999px; }
+h1 { font: 500 clamp(44px, 6.4vw, 88px)/0.98 var(--serif); font-variation-settings: "opsz" 144; letter-spacing: -.035em; margin: 0 0 26px; }
+h1 em { font-style: italic; font-weight: 400; background: var(--light); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .06em; }
+.lead { font-size: 20px; line-height: 1.55; color: var(--dim); max-width: 30em; margin: 0 0 34px; }
+.lead b { color: var(--ink); font-weight: 500; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.fine { margin-top: 18px; }
+
+/* ---------- the stage: a live demonstration of listening ---------- */
+.stage { position: relative; }
+.screen { position: relative; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #2a1d3f 0%, #120f19 55%, #0a0910 100%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 40px 120px -30px rgba(245,158,11,.35), 0 30px 60px -30px rgba(0,0,0,.8);
+  transform: perspective(1400px) rotateY(-7deg) rotateX(2deg); transform-origin: left center; }
+.screen .glow { position: absolute; inset: 0; background: radial-gradient(60% 50% at 50% 45%, rgba(245,158,11,.08), transparent 70%); }
+.screen .label { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; }
+.onair { font: 600 11px/1 var(--mono); letter-spacing: .1em; color: #fff; background: var(--flame); padding: 5px 8px; border-radius: 3px; }
+.slide { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 9% 10% 15%;
+  transition: opacity 420ms var(--out), transform 420ms var(--out), filter 420ms var(--out); }
+.slide p { margin: 0; font: 500 clamp(15px, 1.75vw, 25px)/1.32 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
+.slide small { display: block; margin-top: 14px; font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+.slide.out { opacity: 0; transform: translateY(-6px); filter: blur(4px); transition-duration: 220ms; }
+.slide.pre { opacity: 0; transform: translateY(10px); filter: blur(6px); transition: none; }
+
+/* the operator's view underneath: what was heard, and what's about to go up */
+.desk { position: relative; margin: -26px 0 0 8%; background: rgba(20,17,15,.92); backdrop-filter: blur(12px);
+  border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 14px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7); }
+.desk .row { display: flex; align-items: center; gap: 10px; }
+.mic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(155,123,255,.14); color: var(--violet); flex: none; }
+.mic svg { width: 14px; height: 14px; }
+.heard { min-height: 3.2em; margin: 10px 0 12px; font: italic 400 17px/1.55 var(--serif); color: var(--dim); }
+.heard span { opacity: 0; filter: blur(3px); transition: opacity 260ms var(--out), filter 260ms var(--out), color 300ms var(--out); }
+.heard span.on { opacity: 1; filter: none; }
+.heard span.hit { color: var(--ink); background: linear-gradient(transparent 62%, rgba(245,158,11,.32) 62%); }
+.cue { display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--rule);
+  opacity: 0; transform: translateY(6px); transition: opacity 300ms var(--out), transform 300ms var(--out); }
+.cue.on { opacity: 1; transform: none; }
+.cue b { font: 600 15px/1.2 var(--sans); }
+.cue .why { font: 400 12px/1 var(--mono); color: var(--violet); letter-spacing: .04em; }
+.cue .go { margin-left: auto; display: grid; gap: 5px; justify-items: end; }
+.cue .go .mono { font-size: 11px; }
+.meter { width: 96px; height: 3px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--amber); transform-origin: left; transform: scaleX(0); }
+.meter i.run { transform: scaleX(1); transition: transform 2400ms linear; }
+.controls { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 0 8%; }
+.dots { display: flex; gap: 6px; }
+.dots button { width: 22px; height: 4px; border-radius: 4px; border: 0; padding: 0; background: var(--rule); cursor: pointer; transition: background-color 200ms var(--out); }
+.dots button[aria-current="true"] { background: var(--amber); }
+.pause { background: none; border: 0; color: var(--faint); font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; padding: 6px 0; }
+.pause:hover { color: var(--dim); }
+
+/* ---------- sections ---------- */
+section { position: relative; padding: 120px 0; }
+.rule-top { border-top: 1px solid var(--rule); }
+h2 { font: 500 clamp(34px, 4.4vw, 58px)/1.04 var(--serif); font-variation-settings: "opsz" 144; letter-spacing: -.03em; margin: 0; }
+h2 em { font-style: italic; font-weight: 400; color: var(--amber); }
+.intro { color: var(--dim); font-size: 19px; max-width: 34em; margin: 22px 0 0; }
+
+/* cues: the listening features, set like a running order */
+.cues-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 72px; align-items: start; }
+.cues-grid .sticky { position: sticky; top: 60px; }
+.runorder { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.runorder li { display: grid; grid-template-columns: 70px 1fr; gap: 18px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
+.runorder .n { font: 600 12px/1.9 var(--mono); color: var(--amber); letter-spacing: .08em; }
+.runorder q { display: block; font: italic 400 22px/1.4 var(--serif); color: var(--ink); quotes: "“" "”"; margin-bottom: 10px; }
+.runorder p { margin: 0; color: var(--dim); }
+.runorder p b { color: var(--ink); font-weight: 600; }
+.aside { margin-top: 28px; padding-left: 16px; border-left: 2px solid var(--violet); color: var(--dim); font-size: 15px; }
+
+/* three rooms: the screen, the stream, the room */
+.rooms { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 64px; border-top: 1px solid var(--rule); }
+.room { padding: 34px 32px 10px 0; }
+.room + .room { padding-left: 32px; border-left: 1px solid var(--rule); }
+.room h3 { font: 500 26px/1.1 var(--serif); letter-spacing: -.02em; margin: 10px 0 22px; }
+.room dl { margin: 0; display: grid; gap: 18px; }
+.room dt { font-weight: 600; font-size: 16px; }
+.room dd { margin: 2px 0 0; color: var(--dim); font-size: 15px; line-height: 1.55; }
+
+/* not only churches */
+.rooms-for { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; margin-top: 36px; font: 400 clamp(26px, 3.4vw, 44px)/1.25 var(--serif); letter-spacing: -.02em; color: var(--faint); }
+.rooms-for span:first-child { color: var(--ink); }
+.rooms-for span:not(:last-child)::after { content: "·"; margin-left: 22px; color: var(--rule); }
+
+/* early access: a pass, not a price list */
+.early { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.pass { position: relative; border-radius: 18px; padding: 34px; background:
+  radial-gradient(120% 120% at 100% 0%, rgba(245,158,11,.14), transparent 50%), var(--night-2);
+  border: 1px solid var(--rule); }
+.pass::before, .pass::after { content: ""; position: absolute; top: 50%; width: 26px; height: 26px; border-radius: 50%; background: var(--night); border: 1px solid var(--rule); transform: translateY(-50%); }
+.pass::before { left: -14px; clip-path: inset(0 0 0 50%); }
+.pass::after { right: -14px; clip-path: inset(0 50% 0 0); }
+.pass .top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 22px; border-bottom: 1px dashed #3a322b; }
+.pass h3 { font: 500 30px/1.1 var(--serif); margin: 0; letter-spacing: -.02em; }
+.pass ol { list-style: none; counter-reset: s; margin: 22px 0 26px; padding: 0; display: grid; gap: 16px; }
+.pass li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; }
+.pass li::before { content: "0" counter(s); font: 600 12px/1.9 var(--mono); color: var(--amber); }
+.pass li b { display: block; font-weight: 600; }
+.pass li span { color: var(--dim); font-size: 15px; }
+
+/* questions */
+.faq { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 64px; }
+details { border-bottom: 1px solid var(--rule); }
+details:first-child { border-top: 1px solid var(--rule); }
+summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; padding: 22px 0; font-weight: 600; font-size: 17px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font: 400 22px/1 var(--mono); color: var(--faint); transition: transform 200ms var(--out), color 200ms var(--out); }
+details[open] summary::after { transform: rotate(45deg); color: var(--amber); }
+details p { margin: -6px 0 22px; color: var(--dim); max-width: 38em; }
+
+/* closing */
+.closing { text-align: center; padding: 140px 0; overflow: hidden; }
+.closing::before { content: ""; position: absolute; left: 50%; top: 0; width: 900px; height: 520px; transform: translateX(-50%);
+  background: conic-gradient(from 160deg at 50% 0%, transparent 0deg, rgba(245,158,11,.10) 20deg, rgba(255,77,46,.06) 30deg, transparent 40deg); filter: blur(24px); pointer-events: none; }
+.closing h2 { position: relative; font-size: clamp(40px, 5.6vw, 76px); }
+.closing p { position: relative; color: var(--dim); font-size: 19px; margin: 22px auto 36px; max-width: 30em; }
+.closing .cta { position: relative; justify-content: center; }
+
+footer { border-top: 1px solid var(--rule); padding: 36px 0 52px; color: var(--faint); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; }
+footer .brand { font-size: 15px; color: var(--ink); }
+footer .brand img { width: 22px; height: 22px; }
+footer .sp { flex: 1; }
+footer a { text-decoration: none; color: var(--dim); transition: color 160ms var(--out); }
+footer a:hover { color: var(--ink); }
+
+/* smooth scrolling (Lenis) */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* the running order lights up cue by cue as you scroll, like an operator moving through a service */
+.js .runorder li .n, .js .runorder li q { transition: color 500ms var(--out), opacity 500ms var(--out); }
+.js .runorder li:not(.lit) .n { color: var(--faint); }
+.js .runorder li:not(.lit) q { opacity: .45; }
+
+/* ---------- smaller screens ---------- */
+@media (max-width: 980px) {
+  .hero { min-height: 0; padding-top: 120px; }
+  .hero .wrap, .cues-grid, .early, .faq { grid-template-columns: 1fr; gap: 48px; }
+  .cues-grid .sticky { position: static; }
+  .rooms { grid-template-columns: 1fr; }
+  .room, .room + .room { padding: 30px 0 10px; border-left: 0; }
+  .room + .room { border-top: 1px solid var(--rule); }
+  .screen { transform: none; }
+  .desk, .controls { margin-left: 0; }
+  nav a:not(.btn) { display: none; }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 16px; }
+  section { padding: 84px 0; }
+  .lead { font-size: 18px; }
+  .runorder li { grid-template-columns: 1fr; gap: 6px; }
+  .pass { padding: 26px 22px; }
+  .cue { flex-wrap: wrap; }
+  .heard { font-size: 15px; }
+  .slide { padding: 15% 7% 6%; }
+  .slide p { font-size: 14px; }
+  .desk { margin-top: 12px; }
+}
+
+/* ---------- reduced motion: everything arrives instantly, and the demo stands still ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0ms !important; animation: none !important; }
+  .js .runorder li:not(.lit) .n { color: var(--amber); }
+  .js .runorder li:not(.lit) q { opacity: 1; }
+}
+</style>
+</head>
+<body>
+<script>document.documentElement.classList.add('js')</script>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="logo.svg" alt="">Charis Studio</a>
+    <nav aria-label="Main">
+      <a href="#listens">It listens</a>
+      <a href="#everything">What it does</a>
+      <a href="#early">Early access</a>
+      <a href="#questions">Questions</a>
+      <a class="btn sm text" href="#early">Become a tester</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<div class="hero">
+  <div class="beam"><div class="ray" id="ray"></div></div>
+  <div class="wrap">
+    <div>
+      <div class="kicker"><span class="tag">Early access</span><span class="mono">For Windows</span></div>
+      <h1>It listens, so the screen <em>keeps up.</em></h1>
+      <p class="lead">Lyrics, scripture, cameras, streaming and recording in one app that <b>hears the service</b> and gets the right thing ready before you reach for the mouse.</p>
+      <div class="cta">
+        <a class="btn lit" href="https://github.com/opeyemiogundaisi/charis-studio/releases/latest/download/CharisStudioSetup.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn text" href="#early">Become a tester</a>
+      </div>
+      <p class="fine mono">Windows 10 &amp; 11 · 64-bit · Works offline</p>
+    </div>
+
+    <div class="stage" aria-label="Example: Charis Studio hears the preacher and puts the verse on screen">
+      <div class="screen">
+        <div class="glow"></div>
+        <div class="label"><span class="mono">Projector</span><span class="onair">ON AIR</span></div>
+        <div class="slide" id="slide"><p id="slideText"></p></div>
+      </div>
+      <div class="desk">
+        <div class="row">
+          <span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+          <span class="mono" id="source">Hearing · pulpit mic</span>
+        </div>
+        <div class="heard" id="heard" aria-live="off"></div>
+        <div class="cue" id="cue">
+          <div><b id="cueRef"></b><div class="why" id="cueWhy"></div></div>
+          <div class="go"><span class="mono" id="cueWhen">On screen in 3s</span><span class="meter"><i id="meter"></i></span></div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="dots" id="dots" role="group" aria-label="Examples"></div>
+        <button class="pause" id="pause" type="button">Pause</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="listens" class="rule-top">
+  <div class="wrap cues-grid">
+    <div class="sticky">
+      <span class="mono">The difference</span>
+      <h2 style="margin-top:14px">Follows the service, <em>not</em> the other way round.</h2>
+      <p class="intro">Charis Studio hears what’s said and sung and lines up what comes next. You choose whether it asks first or puts it straight on screen after a short countdown you can cancel.</p>
+      <p class="aside">Speech recognition runs on your PC, so it keeps working when the internet doesn’t. Online speech and AI matching are there when you want extra accuracy.</p>
+    </div>
+    <ol class="runorder">
+      <li><span class="n">Cue 01</span><div><q>Romans chapter eight, verse twenty-eight.</q><p><b>Spoken references</b> go up in the Bible version you chose, and it keeps pace as the reading carries on.</p></div></li>
+      <li><span class="n">Cue 02</span><div><q>…where Paul tells us to put on the whole armour of God.</q><p><b>Described passages</b> are found from the description alone: no chapter or verse needed.</p></div></li>
+      <li><span class="n">Cue 03</span><div><q>The band comes back in for the second verse.</q><p><b>Songs are followed</b> line by line, so the lyrics move with the singers.</p></div></li>
+      <li><span class="n">Cue 04</span><div><q>Let’s welcome our guest speaker.</q><p><b>Scenes change on cue words</b>, and the auto director cuts to whoever is talking.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<section id="everything" class="rule-top">
+  <div class="wrap">
+    <span class="mono">What it does</span>
+    <h2 style="margin-top:14px">One app for the screen,<br>the stream <em>and</em> the room.</h2>
+    <p class="intro">Instead of a presentation program, a streaming program and a pile of plug-ins that don’t talk to each other.</p>
+
+    <div class="rooms">
+      <div class="room">
+        <span class="mono">01 · The screen</span>
+        <h3>What the congregation sees</h3>
+        <dl>
+          <div><dt>Songs and lyrics</dt><dd>Build the order of service, import your songs, show them with themes and backgrounds.</dd></div>
+          <div><dt>Scripture</dt><dd>Type a reference or let it hear one. One verse or a whole passage, in the versions you add.</dd></div>
+          <div><dt>Scenes</dt><dd>Cameras, pictures, videos, text and lower-thirds layered into scenes you switch in one click.</dd></div>
+        </dl>
+      </div>
+      <div class="room">
+        <span class="mono">02 · The stream</span>
+        <h3>What people at home see</h3>
+        <dl>
+          <div><dt>Stream and record</dt><dd>YouTube, Facebook or any RTMP service, several at once, and recording to the PC using your graphics card.</dd></div>
+          <div><dt>Cameras, even phones</dt><dd>USB and capture cards, IP and PTZ cameras, and phones as wireless cameras with nothing extra on the PC.</dd></div>
+          <div><dt>Sound</dt><dd>A built-in mixer that keeps the stream level steady, plus NDI output for the rest of your setup.</dd></div>
+        </dl>
+      </div>
+      <div class="room">
+        <span class="mono">03 · The room</span>
+        <h3>What the team needs</h3>
+        <dl>
+          <div><dt>Stage display</dt><dd>Current and next slide, a clock, a countdown timer and messages from the operator.</dd></div>
+          <div><dt>Phone remote</dt><dd>Move the slides from anywhere in the building over the church Wi-Fi.</dd></div>
+          <div><dt>Made for live</dt><dd>Automatic backups, and windows that recover by themselves, so one glitch doesn’t end the service.</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="rooms-for" aria-label="Who it's for"><span>Churches</span><span>Conferences</span><span>Schools</span><span>Concerts</span><span>Events</span><span>Online shows</span></div>
+  </div>
+</section>
+
+<section id="early" class="rule-top">
+  <div class="wrap early">
+    <div>
+      <span class="mono">Where we are</span>
+      <h2 style="margin-top:14px">We’re in <em>early access.</em></h2>
+      <p class="intro">Charis Studio is being tested in real services right now. We haven’t set plans or prices yet, and we’d rather shape them with the people who use it.</p>
+    </div>
+    <div class="pass">
+      <div class="top"><h3>Tester pass</h3><span class="mono">No cost while we test</span></div>
+      <ol>
+        <li><div><b>Download and install</b><span>Run your songs, scripture and slides straight away.</span></div></li>
+        <li><div><b>Ask for a tester licence</b><span>It switches on every feature, streaming and listening included.</span></div></li>
+        <li><div><b>Tell us what happened</b><span>Your feedback decides what we fix and build next.</span></div></li>
+      </ol>
+      <a class="btn lit" href="mailto:info@charislight.com?subject=Charis%20Studio%20tester%20licence">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        Ask for a tester licence
+      </a>
+    </div>
+  </div>
+</section>
+
+<section id="questions" class="rule-top">
+  <div class="wrap faq">
+    <div><span class="mono">Questions</span><h2 style="margin-top:14px">Before you <em>install.</em></h2></div>
+    <div>
+      <details><summary>Does it need the internet?</summary><p>No. Charis Studio, your licence and the listening features all work offline. You need the internet to stream, and for updates.</p></details>
+      <details><summary>What PC do I need?</summary><p>Windows 10 or 11, 64-bit. For streaming and recording, a graphics card (NVIDIA, Intel or AMD) gives the smoothest results.</p></details>
+      <details><summary>Windows says “Windows protected your PC”.</summary><p>That appears for newer publishers. Click “More info”, then “Run anyway”. Charis Studio then installs and opens by itself.</p></details>
+      <details><summary>How do updates work?</summary><p>Charis Studio downloads updates in the background and applies them the next time you open it, never in the middle of a service.</p></details>
+      <details><summary>Can I use my phone as a camera?</summary><p>Yes. Install the free DroidCam app on the phone, join the same Wi-Fi, and add it in Charis Studio. Nothing extra to install on the PC.</p></details>
+      <details><summary>Is there a Mac version?</summary><p>Not yet. Charis Studio is for Windows today; a Mac version is planned.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="closing rule-top">
+  <div class="wrap">
+    <h2>Bring it to your <em>next service.</em></h2>
+    <p>Install it, use it for real, and tell us how it went.</p>
+    <div class="cta">
+      <a class="btn lit" href="https://github.com/opeyemiogundaisi/charis-studio/releases/latest/download/CharisStudioSetup.exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn text" href="mailto:info@charislight.com?subject=Charis%20Studio%20tester%20licence">Become a tester</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="brand"><img src="logo.svg" alt="">Charis Studio</span>
+    <span>© 2026 Charis Light Media Concept Ltd · RC 8480451</span>
+    <span class="sp"></span>
+    <a href="mailto:info@charislight.com">info@charislight.com</a>
+    <a href="https://charislight.com">charislight.com</a>
+  </div>
+</footer>
+
+<script>
+// The hero demonstration: what the app hears, what it lines up, and the screen changing.
+// It's the one moving thing on the page. It pauses on hover, has a Pause button, and with
+// reduced motion it simply shows each example's result, with no sequence.
+(() => {
+  const EX = [
+    { src: 'Hearing · pulpit mic', words: '…turn with me to the gospel of John, chapter three, verse sixteen.', hit: ['John,', 'chapter', 'three,', 'verse', 'sixteen.'],
+      ref: 'John 3:16', why: 'heard the reference', text: 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.', cite: 'John 3:16 · KJV' },
+    { src: 'Hearing · pulpit mic', words: '…like Paul says, put on the whole armour of God, so you can stand.', hit: ['whole', 'armour', 'of', 'God,'],
+      ref: 'Ephesians 6:11', why: 'understood the description', text: 'Put on the whole armour of God, that ye may be able to stand against the wiles of the devil.', cite: 'Ephesians 6:11 · KJV' },
+    { src: 'Hearing · worship mics', words: '♪ Amazing grace, how sweet the sound, that saved a wretch like me…', hit: ['Amazing', 'grace,'],
+      ref: 'Amazing Grace · verse 1', why: 'following the song', text: 'Amazing grace! How sweet the sound<br>That saved a wretch like me!', cite: 'John Newton · 1779' }
+  ]
+  const $ = (id) => document.getElementById(id)
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const stage = document.querySelector('.stage')
+  let i = 0, timers = [], paused = false, hovering = false
+
+  const dots = EX.map((_, n) => {
+    const b = document.createElement('button')
+    b.type = 'button'; b.setAttribute('aria-label', 'Example ' + (n + 1))
+    b.onclick = () => play(n)
+    $('dots').appendChild(b)
+    return b
+  })
+  const later = (ms, fn) => timers.push(setTimeout(fn, ms))
+  const clear = () => { timers.forEach(clearTimeout); timers = [] }
+
+  function showSlide(ex, instant) {
+    const s = $('slide')
+    const swap = () => {
+      $('slideText').innerHTML = ex.text + '<small>' + ex.cite + '</small>'
+      s.classList.remove('out'); s.classList.add('pre')
+      void s.offsetWidth
+      s.classList.remove('pre')
+    }
+    if (instant) { $('slideText').innerHTML = ex.text + '<small>' + ex.cite + '</small>'; s.className = 'slide'; return }
+    s.classList.add('out'); later(230, swap)
+  }
+
+  function play(n) {
+    clear()
+    i = (n + EX.length) % EX.length
+    const ex = EX[i]
+    dots.forEach((d, k) => d.setAttribute('aria-current', String(k === i)))
+    $('source').textContent = ex.src
+    const words = ex.words.split(' ')
+    $('heard').innerHTML = words.map((w) => '<span>' + w + '</span> ').join('')
+    const spans = [...$('heard').querySelectorAll('span')]
+    $('cueRef').textContent = ex.ref; $('cueWhy').textContent = ex.why
+    const cue = $('cue'), meter = $('meter')
+    meter.classList.remove('run'); cue.classList.remove('on')
+
+    if (reduce) {
+      spans.forEach((s) => { s.classList.add('on'); if (ex.hit.includes(s.textContent)) s.classList.add('hit') })
+      cue.classList.add('on'); $('cueWhen').textContent = 'On screen'
+      showSlide(ex, true)
+      return
+    }
+    $('cueWhen').textContent = 'On screen in 3s'
+    spans.forEach((s, k) => later(140 * k, () => s.classList.add('on')))
+    const heardAt = 140 * spans.length + 200
+    later(heardAt, () => spans.forEach((s) => { if (ex.hit.includes(s.textContent)) s.classList.add('hit') }))
+    later(heardAt + 350, () => { cue.classList.add('on'); void meter.offsetWidth; meter.classList.add('run') })
+    later(heardAt + 2800, () => { $('cueWhen').textContent = 'On screen'; showSlide(ex) })
+    later(heardAt + 7200, () => { if (!paused && !hovering) play(i + 1); else timers = [] })
+  }
+
+  const setPaused = (p) => {
+    paused = p
+    $('pause').textContent = p ? 'Play' : 'Pause'
+    if (!p) play(i + 1)
+    else clear()
+  }
+  $('pause').onclick = () => setPaused(!paused)
+  stage.addEventListener('mouseenter', () => { hovering = true })
+  stage.addEventListener('mouseleave', () => { hovering = false; if (!paused && !timers.length) play(i + 1) })
+  // the last example starts already on screen, so the hero is never empty
+  showSlide(EX[EX.length - 1], true)
+  if (reduce) { $('pause').hidden = true; play(0) } else later(600, () => play(0))
+})()
+</script>
+<script src="vendor/lenis.min.js"></script>
+<script>
+// Scrolling: Lenis glides the page to a stop instead of jumping a notch at a time (the
+// "buttery" feel). Two things follow the scroll: the projector beam drifts a little slower than
+// the page, and the running order lights cue by cue. None of it runs with reduced motion.
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const cues = [...document.querySelectorAll('.runorder li')]
+  if (reduce || !window.Lenis) { cues.forEach((c) => c.classList.add('lit')); return }
+
+  const lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 1, smoothWheel: true })
+  const ray = document.getElementById('ray')
+  lenis.on('scroll', ({ scroll }) => {
+    if (scroll < 1200) ray.style.transform = `translate3d(0, ${scroll * 0.35}px, 0)`
+  })
+  const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf) }
+  requestAnimationFrame(raf)
+
+  // menu and button links glide to their section too
+  document.querySelectorAll('a[href^="#"]').forEach((a) => a.addEventListener('click', (e) => {
+    const id = a.getAttribute('href')
+    const el = id === '#top' ? 0 : document.querySelector(id)
+    if (el === null) return
+    e.preventDefault()
+    lenis.scrollTo(el, { offset: -10, duration: 1.2 })
+  }))
+
+  // a cue lights when it reaches the upper-middle of the screen, and stays lit
+  const io = new IntersectionObserver((list) => list.forEach((x) => {
+    if (x.isIntersecting) { x.target.classList.add('lit'); io.unobserve(x.target) }
+  }), { rootMargin: '0px 0px -45% 0px' })
+  cues.forEach((c) => io.observe(c))
+})()
+</script>
+</body>
+</html>
